@@ -118,7 +118,9 @@
 
         <!-- Weather Display Card -->
         <div id="weather-results" class="hidden opacity-0 transition-opacity duration-500 p-6 rounded-xl border border-gray-600 bg-gray-700/50">
-            <h2 id="location-name" class="text-3xl font-bold text-white text-center mb-4">City, Country</h2>
+            <h2 id="location-name" class="text-3xl font-bold text-white text-center mb-1">City, Country</h2>
+            <!-- Local Time Display -->
+            <p id="local-time" class="text-base font-medium text-gray-400 text-center mb-4">--</p>
 
             <!-- Main Temperature and Icon Block -->
             <div class="flex flex-col items-center justify-center">
@@ -133,9 +135,9 @@
                 <!-- Condition -->
                 <p id="condition-text" class="text-xl text-white font-medium mt-4 border-t border-gray-600 pt-3 w-full text-center">Loading...</p>
                 
-                <!-- Detailed Summary Buttons (Humidity, Wind, UV Index) -->
+                <!-- Detailed Summary Cards (Humidity, Wind, UV Index) -->
                 <div id="detail-summary" class="flex flex-wrap justify-center gap-4 mt-6 pt-4 border-t border-gray-600">
-                    <!-- Buttons will be inserted here by JavaScript -->
+                    <!-- Cards will be inserted here by JavaScript -->
                 </div>
 
             </div> 
@@ -143,22 +145,26 @@
     </div>
 
     <script>
-        // API Configuration
-        const API_KEY = '128c4d5938c34e71b5d123005252910';
-        const BASE_URL = 'https://api.weatherapi.com/v1/current.json';
-
-        // DOM Elements
+        // --- API CONFIGURATION ---
+        const WEATHER_API_KEY = '128c4d5938c34e71b5d123005252910';
+        const WEATHER_BASE_URL = 'https://api.weatherapi.com/v1/current.json';
+        
+        // --- DOM Elements ---
         const locationInput = document.getElementById('location-input');
         const fetchButton = document.getElementById('fetch-button');
         const messageArea = document.getElementById('message-area');
         const weatherResults = document.getElementById('weather-results');
         const locationNameEl = document.getElementById('location-name');
+        const localTimeEl = document.getElementById('local-time');
         const temperatureCEl = document.getElementById('temperature-c');
         const temperatureFEl = document.getElementById('temperature-f');
         const conditionTextEl = document.getElementById('condition-text');
         const weatherIconEl = document.getElementById('weather-icon');
         const rainLayer = document.getElementById('rain-layer'); 
         const detailSummaryEl = document.getElementById('detail-summary');
+        
+        // Removed newsSectionEl since the news content is removed.
+
 
         /**
          * Clears messages, hides the weather card, and removes dynamic background effects.
@@ -174,6 +180,7 @@
             
             rainLayer.classList.remove('active');
             detailSummaryEl.innerHTML = '';
+            localTimeEl.textContent = '--'; // Reset time
         }
 
         /**
@@ -208,6 +215,40 @@
 
             document.body.classList.add(weatherClass);
         }
+        
+        /**
+         * Formats the local time string from the API (e.g., "2024-05-15 15:30") into a readable format.
+         * @param {string} localTimeStr - The raw time string.
+         * @returns {string} Formatted date and time.
+         */
+        function formatLocalTime(localTimeStr) {
+            try {
+                // Replace space with 'T' to help ensure correct parsing by Date object
+                const date = new Date(localTimeStr.replace(' ', 'T')); 
+                
+                // Use Intl.DateTimeFormat for robust, timezone-aware formatting
+                const formatter = new Intl.DateTimeFormat('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric', 
+                    minute: '2-digit', 
+                    hour12: true,
+                    // Note: Date object inherently handles the correct timezone based on the string provided by the API
+                });
+
+                const parts = formatter.formatToParts(date);
+                
+                const formattedDate = parts.filter(p => ['weekday', 'month', 'day'].includes(p.type)).map(p => p.value).join(' ');
+                const formattedTime = parts.filter(p => ['hour', 'minute', 'dayPeriod'].includes(p.type) || p.value === ':').map(p => p.value).join('');
+
+                return `${formattedDate.trim()} | ${formattedTime.trim()}`;
+            } catch (e) {
+                console.error("Error formatting local time:", e);
+                return 'Time unavailable';
+            }
+        }
+
 
         /**
          * Fetches current weather data from the API and updates the UI.
@@ -226,7 +267,7 @@
             fetchButton.classList.add('opacity-50', 'cursor-not-allowed');
             displayMessage("Fetching current weather...", 'info');
 
-            const url = `${BASE_URL}?key=${API_KEY}&q=${location}&aqi=no`; 
+            const url = `${WEATHER_BASE_URL}?key=${WEATHER_API_KEY}&q=${location}&aqi=no`; 
 
             try {
                 const response = await fetch(url);
@@ -247,6 +288,10 @@
                 const { location: loc, current } = data;
 
                 locationNameEl.textContent = `${loc.name}, ${loc.country}`;
+                
+                // Update Local Time
+                localTimeEl.textContent = formatLocalTime(loc.localtime);
+
                 temperatureCEl.textContent = `${Math.round(current.temp_c)}°C`;
                 temperatureFEl.textContent = `${Math.round(current.temp_f)}°F`;
                 conditionTextEl.textContent = current.condition.text;
@@ -256,7 +301,7 @@
                 const wind = current.wind_kph;
                 const uv = current.uv;
                 
-                // New design: Dark background, sky blue text for values, accent border
+                // Detailed card design
                 const cardClasses = "p-4 bg-gray-800 rounded-2xl text-white text-center shadow-lg min-w-[120px] flex-1 border border-sky-600 transition hover:bg-gray-700/50";
 
                 const summaryHtml = `
