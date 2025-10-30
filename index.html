@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Weather Forecast</title>
+    <!-- Load Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for font and layout */
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            transition: background 1.5s ease; /* Smooth transition for color change */
+            /* Default background for initial load */
+            background: linear-gradient(135deg, #475569, #334155); 
+        }
+
+        /* --- Dynamic Weather Backgrounds (for mood/color) --- */
+        .bg-rainy {
+            background: linear-gradient(135deg, #1f3f60, #142a42) !important;
+        }
+        .bg-clear {
+            background: linear-gradient(135deg, #3b82f6, #06b6d4) !important;
+        }
+        .bg-cloudy {
+            background: linear-gradient(135deg, #475569, #334155) !important;
+        }
+        .bg-snowy {
+            background: linear-gradient(135deg, #94a3b8, #64748b) !important;
+        }
+        /* --- End Dynamic Backgrounds --- */
+
+        /* Style for the main card (Slightly transparent and blurred to see background effects) */
+        .weather-card {
+            background: rgba(17, 24, 39, 0.75); 
+            backdrop-filter: blur(8px); /* Subtle glass effect */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+        }
+
+        /* --- RAIN DROP EFFECT CSS --- */
+        #rain-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0; /* Ensures it is behind the weather app content */
+            opacity: 0;
+            transition: opacity 1s;
+        }
+
+        /* Activate the rain effect */
+        #rain-layer.active {
+            opacity: 0.7; /* Adjust opacity for better visibility */
+        }
+
+        /* Generate raindrops using a repeating radial gradient and animation */
+        #rain-layer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            /* Defines the shape and color of the raindrops */
+            background-image: radial-gradient(circle at 50% 100%, rgba(255, 255, 255, 0.4) 0.5px, transparent 1.5px);
+            background-size: 10px 100px; /* Spacing and length of the rain streaks */
+            animation: rain-fall 5s linear infinite;
+        }
+
+        @keyframes rain-fall {
+            from {
+                background-position: 0% 0;
+            }
+            to {
+                background-position: 0% 100vh; /* Scrolls the background texture downwards */
+            }
+        }
+        /* --- END RAIN DROP EFFECT CSS --- */
+    </style>
+</head>
+<body>
+    
+    <!-- RAIN LAYER: Fixed position, full-screen for the effect -->
+    <div id="rain-layer"></div>
+
+    <div id="app" class="relative z-10 w-full max-w-lg mx-auto p-8 rounded-xl shadow-2xl border border-gray-700 weather-card">
+        <h1 class="text-3xl font-extrabold text-white text-center mb-6">
+            <span class="text-sky-400">Current</span> Weather Status
+        </h1>
+
+        <!-- Input Section -->
+        <div class="flex flex-col sm:flex-row gap-4 mb-8">
+            <input
+                type="text"
+                id="location-input"
+                placeholder="Enter city name (e.g., Tokyo, New York)"
+                class="flex-grow p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 border border-gray-600"
+            >
+            <button
+                id="fetch-button"
+                class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200 shadow-md shadow-sky-900/50 active:translate-y-0.5"
+            >
+                Get Weather
+            </button>
+        </div>
+
+        <!-- Loading & Error Message Area -->
+        <div id="message-area" class="text-center mb-6 min-h-[24px]">
+            <!-- Messages will appear here -->
+        </div>
+
+        <!-- Weather Display Card -->
+        <div id="weather-results" class="hidden opacity-0 transition-opacity duration-500 p-6 rounded-xl border border-gray-600 bg-gray-700/50">
+            <h2 id="location-name" class="text-3xl font-bold text-white text-center mb-4">City, Country</h2>
+
+            <!-- Main Temperature and Icon Block -->
+            <div class="flex flex-col items-center justify-center">
+                <div class="flex items-center space-x-6">
+                    <img id="weather-icon" src="" alt="Weather Icon" class="w-20 h-20">
+                    <div class="flex flex-col items-start">
+                        <span id="temperature-c" class="text-7xl font-extrabold text-sky-400 leading-none">--°C</span>
+                        <span id="temperature-f" class="text-2xl text-gray-400 mt-2">--°F</span>
+                    </div>
+                </div>
+
+                <!-- Condition -->
+                <p id="condition-text" class="text-xl text-white font-medium mt-4 border-t border-gray-600 pt-3 w-full text-center">Loading...</p>
+                
+                <!-- Detailed Summary Buttons (Humidity, Wind, UV Index) -->
+                <div id="detail-summary" class="flex flex-wrap justify-center gap-4 mt-6 pt-4 border-t border-gray-600">
+                    <!-- Buttons will be inserted here by JavaScript -->
+                </div>
+
+            </div> 
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_KEY = '128c4d5938c34e71b5d123005252910';
+        const BASE_URL = 'https://api.weatherapi.com/v1/current.json';
+
+        // DOM Elements
+        const locationInput = document.getElementById('location-input');
+        const fetchButton = document.getElementById('fetch-button');
+        const messageArea = document.getElementById('message-area');
+        const weatherResults = document.getElementById('weather-results');
+        const locationNameEl = document.getElementById('location-name');
+        const temperatureCEl = document.getElementById('temperature-c');
+        const temperatureFEl = document.getElementById('temperature-f');
+        const conditionTextEl = document.getElementById('condition-text');
+        const weatherIconEl = document.getElementById('weather-icon');
+        const rainLayer = document.getElementById('rain-layer'); 
+        const detailSummaryEl = document.getElementById('detail-summary');
+
+        /**
+         * Clears messages, hides the weather card, and removes dynamic background effects.
+         */
+        function resetUI() {
+            messageArea.innerHTML = '';
+            weatherResults.classList.add('hidden', 'opacity-0');
+            
+            // Reset dynamic background classes
+            const bodyClasses = ['bg-rainy', 'bg-clear', 'bg-snowy', 'bg-cloudy'];
+            document.body.classList.remove(...bodyClasses);
+            document.body.style.background = 'linear-gradient(135deg, #475569, #334155)'; // Default fallback
+            
+            rainLayer.classList.remove('active');
+            detailSummaryEl.innerHTML = '';
+        }
+
+        /**
+         * Displays a message to the user.
+         */
+        function displayMessage(message, type) {
+            const color = type === 'error' ? 'text-red-400' : 'text-yellow-400';
+            messageArea.innerHTML = `<p class="${color} font-medium">${message}</p>`;
+        }
+        
+        /**
+         * Determines the background class and effect based on weather condition.
+         * @param {string} conditionText - The raw weather condition text from the API.
+         */
+        function updateBackgroundAndEffects(conditionText) {
+            const bodyClasses = ['bg-rainy', 'bg-clear', 'bg-snowy', 'bg-cloudy'];
+            document.body.classList.remove(...bodyClasses);
+            rainLayer.classList.remove('active');
+
+            const lowerCaseCondition = conditionText.toLowerCase();
+            let weatherClass = 'bg-cloudy'; // Default (Cloudy, Overcast)
+
+            if (lowerCaseCondition.includes('rain') || lowerCaseCondition.includes('drizzle') || lowerCaseCondition.includes('shower') || lowerCaseCondition.includes('mist')) {
+                weatherClass = 'bg-rainy';
+                rainLayer.classList.add('active'); // Activate rain effect
+            } else if (lowerCaseCondition.includes('clear') || lowerCaseCondition.includes('sun')) {
+                weatherClass = 'bg-clear';
+            } else if (lowerCaseCondition.includes('snow') || lowerCaseCondition.includes('sleet') || lowerCaseCondition.includes('ice') || lowerCaseCondition.includes('blizzard')) {
+                weatherClass = 'bg-snowy';
+            } 
+            // If none of the above, it defaults to 'bg-cloudy'
+
+            document.body.classList.add(weatherClass);
+        }
+
+        /**
+         * Fetches current weather data from the API and updates the UI.
+         */
+        async function fetchWeather() {
+            resetUI();
+            const location = locationInput.value.trim();
+
+            if (!location) {
+                displayMessage("Please enter a location.", 'error');
+                return;
+            }
+
+            // Disable button and show loading state
+            fetchButton.disabled = true;
+            fetchButton.classList.add('opacity-50', 'cursor-not-allowed');
+            displayMessage("Fetching current weather...", 'info');
+
+            const url = `${BASE_URL}?key=${API_KEY}&q=${location}&aqi=no`; 
+
+            try {
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    if (errorData.error && errorData.error.code === 1006) {
+                         displayMessage(`Weather data not found for "${location}". Please check the spelling or try a different city.`, 'error');
+                    } else {
+                         displayMessage(`API Error: ${response.status} - ${errorData.error ? errorData.error.message : 'Unknown error.'}`, 'error');
+                    }
+                    return;
+                }
+
+                const data = await response.json();
+                
+                // --- Update UI with Current Weather Data ---
+                const { location: loc, current } = data;
+
+                locationNameEl.textContent = `${loc.name}, ${loc.country}`;
+                temperatureCEl.textContent = `${Math.round(current.temp_c)}°C`;
+                temperatureFEl.textContent = `${Math.round(current.temp_f)}°F`;
+                conditionTextEl.textContent = current.condition.text;
+                
+                // Construct the summary buttons (Humidity, Wind, UV Index)
+                const humidity = current.humidity;
+                const wind = current.wind_kph;
+                const uv = current.uv;
+                
+                // New design: Dark background, sky blue text for values, accent border
+                const cardClasses = "p-4 bg-gray-800 rounded-2xl text-white text-center shadow-lg min-w-[120px] flex-1 border border-sky-600 transition hover:bg-gray-700/50";
+
+                const summaryHtml = `
+                    <!-- Humidity Card -->
+                    <div class="${cardClasses}">
+                        <h3 class="text-xs font-semibold uppercase text-gray-400 tracking-wider">HUMIDITY</h3>
+                        <p class="text-3xl font-extrabold mt-1 text-sky-400">${humidity}%</p>
+                    </div>
+                    <!-- Wind Card -->
+                    <div class="${cardClasses}">
+                        <h3 class="text-xs font-semibold uppercase text-gray-400 tracking-wider">WIND (KPH)</h3>
+                        <p class="text-3xl font-extrabold mt-1 text-sky-400">${wind}</p>
+                    </div>
+                    <!-- UV Index Card -->
+                    <div class="${cardClasses}">
+                        <h3 class="text-xs font-semibold uppercase text-gray-400 tracking-wider">UV INDEX</h3>
+                        <p class="text-3xl font-extrabold mt-1 text-sky-400">${uv}</p>
+                    </div>
+                `;
+                detailSummaryEl.innerHTML = summaryHtml;
+
+
+                // Apply dynamic background and effects
+                updateBackgroundAndEffects(current.condition.text);
+
+                // Update icon
+                weatherIconEl.src = `https:${current.condition.icon}`;
+                weatherIconEl.alt = current.condition.text;
+
+                // Clear loading message and display results with a smooth transition
+                messageArea.innerHTML = '';
+                weatherResults.classList.remove('hidden');
+                setTimeout(() => {
+                    weatherResults.classList.remove('opacity-0');
+                }, 10);
+                
+            } catch (error) {
+                console.error("Fetch failed:", error);
+                displayMessage("A network error occurred. Please check your connection.", 'error');
+            } finally {
+                // Re-enable the button
+                fetchButton.disabled = false;
+                fetchButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // Attach event listeners
+        fetchButton.addEventListener('click', fetchWeather);
+
+        // Allow pressing Enter key in the input field
+        locationInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                fetchWeather();
+            }
+        });
+
+        // Initial default search when the page loads
+        window.onload = () => {
+             locationInput.value = 'London';
+             fetchWeather();
+        };
+
+    </script>
+</body>
+</html>
