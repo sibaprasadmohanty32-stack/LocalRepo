@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dynamic Weather Forecast</title>
-    <!-- Load Tailwind CSS for modern styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Custom styles for font and layout */
@@ -87,7 +86,6 @@
 </head>
 <body>
     
-    <!-- RAIN LAYER: Fixed position, full-screen for the effect -->
     <div id="rain-layer"></div>
 
     <div id="app" class="relative z-10 w-full max-w-lg mx-auto p-8 rounded-xl shadow-2xl border border-gray-700 weather-card">
@@ -95,7 +93,6 @@
             <span class="text-sky-400">Current</span> Weather Status
         </h1>
 
-        <!-- Input Section -->
         <div class="flex flex-col sm:flex-row gap-4 mb-8">
             <input
                 type="text"
@@ -111,18 +108,13 @@
             </button>
         </div>
 
-        <!-- Loading & Error Message Area -->
         <div id="message-area" class="text-center mb-6 min-h-[24px]">
-            <!-- Messages will appear here -->
-        </div>
+            </div>
 
-        <!-- Weather Display Card -->
         <div id="weather-results" class="hidden opacity-0 transition-opacity duration-500 p-6 rounded-xl border border-gray-600 bg-gray-700/50">
             <h2 id="location-name" class="text-3xl font-bold text-white text-center mb-1">City, Country</h2>
-            <!-- Local Time Display -->
             <p id="local-time" class="text-base font-medium text-gray-400 text-center mb-4">--</p>
 
-            <!-- Main Temperature and Icon Block -->
             <div class="flex flex-col items-center justify-center">
                 <div class="flex items-center space-x-6">
                     <img id="weather-icon" src="" alt="Weather Icon" class="w-20 h-20">
@@ -132,15 +124,23 @@
                     </div>
                 </div>
 
-                <!-- Condition -->
                 <p id="condition-text" class="text-xl text-white font-medium mt-4 border-t border-gray-600 pt-3 w-full text-center">Loading...</p>
                 
-                <!-- Detailed Summary Cards (Humidity, Wind, UV Index) -->
                 <div id="detail-summary" class="flex flex-wrap justify-center gap-4 mt-6 pt-4 border-t border-gray-600">
-                    <!-- Cards will be inserted here by JavaScript -->
+                    </div>
+                
+                <div class="mt-8 pt-4 border-t border-gray-600 w-full text-center">
+                    <button
+                        id="ai-insight-button"
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200 shadow-md shadow-purple-900/50 active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled
+                    >
+                        ✨ Get AI Insight
+                    </button>
+                    <div id="ai-message-area" class="mt-4 p-4 bg-gray-800 rounded-xl text-gray-200 text-left hidden border border-purple-600">
+                        </div>
                 </div>
-
-            </div> 
+                </div> 
         </div>
     </div>
 
@@ -148,6 +148,11 @@
         // --- API CONFIGURATION ---
         const WEATHER_API_KEY = '128c4d5938c34e71b5d123005252910';
         const WEATHER_BASE_URL = 'https://api.weatherapi.com/v1/current.json';
+        
+        // **IMPORTANT:** In a real application, you would set up a secure backend endpoint 
+        // to call the Gemini API, so your API key is not exposed in the frontend.
+        // Replace this with your actual backend endpoint for AI generation.
+        const AI_API_ENDPOINT = 'YOUR_SECURE_BACKEND_GEMINI_ENDPOINT'; 
         
         // --- DOM Elements ---
         const locationInput = document.getElementById('location-input');
@@ -163,7 +168,12 @@
         const rainLayer = document.getElementById('rain-layer'); 
         const detailSummaryEl = document.getElementById('detail-summary');
         
-        // Removed newsSectionEl since the news content is removed.
+        // NEW AI Elements
+        const aiInsightButton = document.getElementById('ai-insight-button');
+        const aiMessageArea = document.getElementById('ai-message-area');
+        
+        // Variable to hold the last fetched weather data for AI
+        let lastWeatherData = null;
 
 
         /**
@@ -181,13 +191,19 @@
             rainLayer.classList.remove('active');
             detailSummaryEl.innerHTML = '';
             localTimeEl.textContent = '--'; // Reset time
+            
+            // Reset AI components
+            aiInsightButton.disabled = true;
+            aiMessageArea.classList.add('hidden');
+            aiMessageArea.innerHTML = '';
+            lastWeatherData = null;
         }
 
         /**
          * Displays a message to the user.
          */
         function displayMessage(message, type) {
-            const color = type === 'error' ? 'text-red-400' : 'text-yellow-400';
+            const color = type === 'error' ? 'text-red-400' : type === 'info' ? 'text-yellow-400' : 'text-yellow-400';
             messageArea.innerHTML = `<p class="${color} font-medium">${message}</p>`;
         }
         
@@ -284,6 +300,9 @@
 
                 const data = await response.json();
                 
+                // Store data globally for AI insight generation
+                lastWeatherData = data; 
+                
                 // --- Update UI with Current Weather Data ---
                 const { location: loc, current } = data;
 
@@ -305,17 +324,14 @@
                 const cardClasses = "p-4 bg-gray-800 rounded-2xl text-white text-center shadow-lg min-w-[120px] flex-1 border border-sky-600 transition hover:bg-gray-700/50";
 
                 const summaryHtml = `
-                    <!-- Humidity Card -->
                     <div class="${cardClasses}">
                         <h3 class="text-xs font-semibold uppercase text-gray-400 tracking-wider">HUMIDITY</h3>
                         <p class="text-3xl font-extrabold mt-1 text-sky-400">${humidity}%</p>
                     </div>
-                    <!-- Wind Card -->
                     <div class="${cardClasses}">
                         <h3 class="text-xs font-semibold uppercase text-gray-400 tracking-wider">WIND (KPH)</h3>
                         <p class="text-3xl font-extrabold mt-1 text-sky-400">${wind}</p>
                     </div>
-                    <!-- UV Index Card -->
                     <div class="${cardClasses}">
                         <h3 class="text-xs font-semibold uppercase text-gray-400 tracking-wider">UV INDEX</h3>
                         <p class="text-3xl font-extrabold mt-1 text-sky-400">${uv}</p>
@@ -338,6 +354,9 @@
                     weatherResults.classList.remove('opacity-0');
                 }, 10);
                 
+                // Enable AI button after successful fetch
+                aiInsightButton.disabled = false;
+                
             } catch (error) {
                 console.error("Fetch failed:", error);
                 displayMessage("A network error occurred. Please check your connection.", 'error');
@@ -348,8 +367,69 @@
             }
         }
 
+        /**
+         * Fetches an AI-generated message about the weather using the stored data.
+         * NOTE: This function is a simulation. You must replace the fetch call
+         * with a call to your secure backend endpoint for the Gemini API.
+         */
+        async function getAiInsight() {
+            if (!lastWeatherData) return; // Should not happen if button is disabled correctly
+
+            aiInsightButton.disabled = true;
+            aiMessageArea.classList.remove('hidden');
+            aiMessageArea.innerHTML = '<p class="text-center text-purple-400">🧠 Generating insight...</p>';
+            
+            // Extract key information for the prompt
+            const { location: loc, current } = lastWeatherData;
+            const weatherPrompt = `The current weather in ${loc.name}, ${loc.country} is ${current.condition.text} with a temperature of ${current.temp_c}°C (feels like ${current.feelslike_c}°C). Wind is ${current.wind_kph} KPH and humidity is ${current.humidity}%. UV Index is ${current.uv}. Give a short, fun, conversational message (2-3 sentences max) that summarizes the weather and provides a simple, relevant suggestion (e.g., 'grab an umbrella', 'perfect for a park walk'). Do NOT use emojis.`;
+
+            // --- SIMULATED AI API CALL (Replace with real Gemini API call) ---
+            try {
+                // In a real app, this would be a POST request to your backend:
+                /*
+                const response = await fetch(AI_API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: weatherPrompt })
+                });
+                
+                if (!response.ok) throw new Error('AI backend failed to respond.');
+                const data = await response.json();
+                const aiResponseText = data.aiMessage; // Adjust key as per your backend
+                */
+                
+                // **Placeholder for the AI response (since I can't call external APIs):**
+                // This simulates the actual message structure you'd get from Gemini.
+                await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
+
+                let aiResponseText = '';
+                if (current.condition.text.toLowerCase().includes('rain') || current.condition.text.toLowerCase().includes('shower')) {
+                    aiResponseText = `Looks like a dreary day in ${loc.name}. The rain means you definitely need to grab that umbrella before heading out. The air might feel damp with ${current.humidity}% humidity, so indoor activities are a great choice!`;
+                } else if (current.condition.text.toLowerCase().includes('clear') || current.condition.text.toLowerCase().includes('sun')) {
+                    aiResponseText = `What a beautiful, clear day in ${loc.name}! With the sun out, it's the perfect time for a park walk. Don't forget a hat or sunscreen, especially with a UV Index of ${current.uv}.`;
+                } else if (current.condition.text.toLowerCase().includes('cloudy') || current.condition.text.toLowerCase().includes('overcast')) {
+                    aiResponseText = `It's mostly cloudy in ${loc.name} right now, keeping things cool at ${current.temp_c}°C. It's a comfortable temperature for errands, but the strong breeze at ${current.wind_kph} KPH might make it feel colder.`;
+                } else if (current.condition.text.toLowerCase().includes('snow')) {
+                    aiResponseText = `It's snowing in ${loc.name}! Get your warmest coat on before going outside. The conditions are perfect for cozying up with a hot drink indoors.`;
+                } else {
+                    aiResponseText = `The weather in ${loc.name} is currently ${current.condition.text} at ${current.temp_c}°C. It's an interesting mix, so be sure to dress in layers!`;
+                }
+                
+                // Set the message
+                aiMessageArea.innerHTML = `<p class="font-medium">**AI Insight for ${loc.name}:**</p><p class="mt-2">${aiResponseText}</p>`;
+                
+            } catch (error) {
+                console.error("AI Insight failed:", error);
+                aiMessageArea.innerHTML = '<p class="text-red-400">Could not retrieve AI insight. Please try again later.</p>';
+            } finally {
+                aiInsightButton.disabled = false;
+            }
+        }
+
+
         // Attach event listeners
         fetchButton.addEventListener('click', fetchWeather);
+        aiInsightButton.addEventListener('click', getAiInsight); // NEW listener
 
         // Allow pressing Enter key in the input field
         locationInput.addEventListener('keypress', function(event) {
